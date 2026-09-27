@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Android IME</string>
+    <string name="ime_name">Simple Kotlin IME</string>
+    <string name="subtype_en_us">English (US)</string>
+    <string name="btn_enable_ime">1. IME を有効にする</string>
+    <string name="btn_select_ime">2. IME を選択する</string>
+    <string name="test_input_hint">ここで入力テストができます</string>
+</resources>

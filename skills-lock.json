@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "genshijin": {
+      "source": "interfacex-co-jp/genshijin",
+      "sourceType": "github",
+      "skillPath": "skills/genshijin/SKILL.md",
+      "computedHash": "905fc789552518db9405ddbc767aca68794fab0af686af73d73999f39bffda91"
+    }
+  }
+}
