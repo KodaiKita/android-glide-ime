@@ -149,27 +149,26 @@ class Shark2Recognizer(
         val inputStart = inputResampled.first()
         val inputEnd = inputResampled.last()
 
-        // 2. 始点・終点キーの近傍キーを特定
+        // 2. 始点・終点キーの近傍キーから全候補単語を網羅的に抽出（頻度足切りを撤廃）
         val startCandidates = findNearestKeys(inputStart, data.keyCoordinates, maxCount = 4)
         val endCandidates = findNearestKeys(inputEnd, data.keyCoordinates, maxCount = 4)
 
-        val targetWords = mutableListOf<String>()
-        val maxWordsPerBucket = 40
-
+        val wordsToEvaluate = LinkedHashSet<String>()
         for (sc in startCandidates) {
             for (ec in endCandidates) {
                 val bucket = data.startEndBuckets[Pair(sc, ec)] ?: continue
-                val limit = minOf(bucket.size, maxWordsPerBucket)
-                for (i in 0 until limit) {
-                    targetWords.add(bucket[i])
-                }
+                wordsToEvaluate.addAll(bucket)
             }
         }
 
-        val wordsToEvaluate = if (targetWords.isNotEmpty()) targetWords else data.dictMap.keys.take(200)
+        if (wordsToEvaluate.isEmpty()) {
+            return emptyList()
+        }
 
         val scoredRomajiList = mutableListOf<Pair<String, Float>>()
-        val maxTerminalDist = data.averageKeyDistance * 2.5f
+        val maxTerminalDist = data.averageKeyDistance * 2.0f
+        val maxLocDist = data.averageKeyDistance * 1.8f
+        val maxShapeDist = 0.45f
 
         for (word in wordsToEvaluate) {
             val templatePair = getOrComputeTemplate(word, data.keyCoordinates) ?: continue
@@ -186,29 +185,36 @@ class Shark2Recognizer(
                 continue
             }
 
-            // Location Distance
-            var locSum = 0f
-            for (i in 0 until resampleCount) {
-                locSum += distance(inputResampled[i], ideal[i])
-            }
-            val locDist = locSum / resampleCount
-
-            // Shape Distance
+            // 【Stage 2: 幾何 Shape 距離の計算と閾値剪定】
             var shapeSum = 0f
             for (i in 0 until resampleCount) {
                 shapeSum += distance(inputNormalized[i], idealNorm[i])
             }
             val shapeDist = shapeSum / resampleCount
+            if (shapeDist > maxShapeDist) {
+                continue // 幾何形状が明らかに異なる単語を早期破棄
+            }
 
-            // 頻度ボーナス (0.0 ~ 15.0 のスコア控除)
+            // 【Stage 3: 幾何 Location 距離の計算と閾値剪定】
+            var locSum = 0f
+            for (i in 0 until resampleCount) {
+                locSum += distance(inputResampled[i], ideal[i])
+            }
+            val locDist = locSum / resampleCount
+            if (locDist > maxLocDist) {
+                continue // 位置ズレが大きすぎる単語を早期破棄
+            }
+
+            // 【Stage 4: 幾何合格者のみ言語頻度を対数統合】
             val entry = data.dictMap[word]
-            val freqBonus = (entry?.frequency ?: 50) * 0.15f
+            val freq = entry?.frequency ?: 1
+            val freqBonus = kotlin.math.log10(freq.toFloat().coerceAtLeast(1f)) * 5.0f
 
             // SHARK2 複合距離スコア
-            val score = (0.4f * locDist) +
-                    (0.3f * shapeDist * data.averageKeyDistance) +
-                    (0.15f * startDist) +
-                    (0.15f * endDist) - freqBonus
+            val score = (0.45f * locDist) +
+                    (0.35f * shapeDist * data.averageKeyDistance) +
+                    (0.10f * startDist) +
+                    (0.10f * endDist) - freqBonus
 
             scoredRomajiList.add(Pair(word, score))
         }
