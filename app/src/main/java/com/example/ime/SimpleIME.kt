@@ -312,7 +312,7 @@ class SimpleIME : InputMethodService() {
         }
 
         val strokePointsCopy = currentStrokePoints.toList()
-        val groups = recognizer.recognizeGroups(currentStroke, topN = 8)
+        val groups = recognizer.recognizeTimed(strokePointsCopy, topN = 8)
 
         logGlideSession(strokePointsCopy, groups)
 

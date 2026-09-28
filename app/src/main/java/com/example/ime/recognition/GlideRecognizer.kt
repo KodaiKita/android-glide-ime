@@ -26,4 +26,7 @@ interface GlideRecognizer {
     fun setKeyLayout(keyMap: Map<Char, Pair<Float, Float>>)
     fun recognize(stroke: List<Pair<Float, Float>>, topN: Int = 5): List<RecognitionCandidate>
     fun recognizeGroups(stroke: List<Pair<Float, Float>>, topN: Int = 6): List<RomajiCandidateGroup>
+    fun recognizeTimed(stroke: List<com.example.ime.model.TouchPoint>, topN: Int = 8): List<RomajiCandidateGroup> {
+        return recognizeGroups(stroke.map { Pair(it.x, it.y) }, topN)
+    }
 }
