@@ -215,31 +215,39 @@ class SimpleIME : InputMethodService() {
         }
     }
 
+    private val currentStrokePoints = mutableListOf<com.example.ime.model.TouchPoint>()
+
     private fun handleTouchEvent(event: MotionEvent) {
         val x = event.x
         val y = event.y
+        val time = event.eventTime
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 currentStroke.clear()
+                currentStrokePoints.clear()
                 currentStroke.add(Pair(x, y))
+                currentStrokePoints.add(com.example.ime.model.TouchPoint(x, y, time))
                 binding.glideOverlayView.onTouchDown(x, y)
                 downKey = findKeyAt(x, y)
             }
 
             MotionEvent.ACTION_MOVE -> {
                 currentStroke.add(Pair(x, y))
+                currentStrokePoints.add(com.example.ime.model.TouchPoint(x, y, time))
                 binding.glideOverlayView.onTouchMove(x, y)
             }
 
             MotionEvent.ACTION_UP -> {
                 currentStroke.add(Pair(x, y))
+                currentStrokePoints.add(com.example.ime.model.TouchPoint(x, y, time))
                 binding.glideOverlayView.onTouchUp()
                 processStroke()
             }
 
             MotionEvent.ACTION_CANCEL -> {
                 currentStroke.clear()
+                currentStrokePoints.clear()
                 binding.glideOverlayView.clearTrail()
             }
         }
@@ -303,7 +311,11 @@ class SimpleIME : InputMethodService() {
             return
         }
 
+        val strokePointsCopy = currentStrokePoints.toList()
         val groups = recognizer.recognizeGroups(currentStroke, topN = 8)
+
+        logGlideSession(strokePointsCopy, groups)
+
         if (groups.isNotEmpty()) {
             currentCandidateGroups = groups
             selectedGroupIndex = 0
@@ -320,6 +332,69 @@ class SimpleIME : InputMethodService() {
             if (isShifted) {
                 isShifted = false
                 updateKeyboardKeys()
+            }
+        }
+    }
+
+    private fun logGlideSession(
+        points: List<com.example.ime.model.TouchPoint>,
+        groups: List<RomajiCandidateGroup>
+    ) {
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                val json = org.json.JSONObject()
+                json.put("timestamp", System.currentTimeMillis())
+
+                val kbObj = org.json.JSONObject()
+                kbObj.put("width", binding.keyboardFrame.width)
+                kbObj.put("height", binding.keyboardFrame.height)
+                json.put("keyboard", kbObj)
+
+                // Layout
+                val layoutObj = org.json.JSONObject()
+                for ((char, coord) in keyCoordinates) {
+                    val posArr = org.json.JSONArray()
+                    posArr.put(coord.first.toDouble())
+                    posArr.put(coord.second.toDouble())
+                    layoutObj.put(char.toString(), posArr)
+                }
+                json.put("key_layout", layoutObj)
+
+                // Points
+                val pointsArr = org.json.JSONArray()
+                for (p in points) {
+                    val ptArr = org.json.JSONArray()
+                    ptArr.put(p.x.toDouble())
+                    ptArr.put(p.y.toDouble())
+                    ptArr.put(p.timestamp)
+                    pointsArr.put(ptArr)
+                }
+                json.put("points", pointsArr)
+
+                // Recognition results
+                val resultsArr = org.json.JSONArray()
+                for (g in groups) {
+                    val rObj = org.json.JSONObject()
+                    rObj.put("romaji", g.romaji)
+                    rObj.put("hiragana", g.hiragana)
+                    rObj.put("score", g.score.toDouble())
+                    val kanjiArr = org.json.JSONArray()
+                    for (k in g.kanjiList) {
+                        kanjiArr.put(k)
+                    }
+                    rObj.put("kanji_list", kanjiArr)
+                    resultsArr.put(rObj)
+                }
+                json.put("device_results", resultsArr)
+
+                val logLine = json.toString()
+                android.util.Log.d("GLIDE_LOG", logLine)
+
+                // Local file append
+                val logFile = java.io.File(filesDir, "glide_history.jsonl")
+                logFile.appendText(logLine + "\n")
+            } catch (e: Exception) {
+                android.util.Log.e("GLIDE_LOG", "Failed to write glide log", e)
             }
         }
     }
