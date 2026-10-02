@@ -248,16 +248,37 @@ class Shark2Recognizer(
                 }
             }
 
+            // 【Stage 3.5: 各キー通過網羅度チェック (Key Coverage Check)】
+            var maxKeyMissDist = 0f
+            for (ch in word) {
+                val keyCoord = data.keyCoordinates[ch] ?: continue
+                var minD = Float.MAX_VALUE
+                for (pt in inputTrajectory) {
+                    val d = distance(Pair(pt.x, pt.y), keyCoord)
+                    if (d < minD) minD = d
+                }
+                if (minD > maxKeyMissDist) {
+                    maxKeyMissDist = minD
+                }
+            }
+            // キーを大きく外している（130px以上通過していない文字がある）場合はペナルティ
+            val keyCoveragePenalty = if (maxKeyMissDist > data.averageKeyDistance * 1.1f) {
+                (maxKeyMissDist - data.averageKeyDistance * 1.1f) * 0.8f
+            } else {
+                0f
+            }
+
             // 【Stage 4: 頻度対数スコアの統合】
             val entry = data.dictMap[word]
             val freq = entry?.frequency ?: 1
             val freqBonus = log10(freq.toFloat().coerceAtLeast(1f)) * 5.0f
 
-            // SHARK2 + Kinematic 複合スコア
+            // SHARK2 + Kinematic + Key Coverage 複合スコア
             val score = (0.45f * weightedLocDist) +
                     (0.35f * shapeDist * data.averageKeyDistance) +
                     (0.10f * startDist) +
-                    (0.10f * endDist) - freqBonus - geminateBonus
+                    (0.10f * endDist) +
+                    keyCoveragePenalty - freqBonus - geminateBonus
 
             scoredRomajiList.add(Pair(word, score))
         }
@@ -282,7 +303,8 @@ class Shark2Recognizer(
                         romaji = romaji,
                         hiragana = entry.hiragana,
                         kanjiList = entry.kanjiList,
-                        score = score
+                        score = score,
+                        isEnglish = entry.isEnglish
                     )
                 )
             }

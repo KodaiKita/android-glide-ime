@@ -1,13 +1,14 @@
 package com.example.ime.recognition
 
 /**
- * ローマ字候補グループ（1つのローマ字とそれに対応する漢字・かな候補リスト）
+ * 候補グループ（日本語ローマ字および英単語をシームレスに表現）
  */
 data class RomajiCandidateGroup(
     val romaji: String,
     val hiragana: String = romaji,
     val kanjiList: List<String> = listOf(romaji),
-    val score: Float = 0f
+    val score: Float = 0f,
+    val isEnglish: Boolean = false
 )
 
 /**
@@ -19,7 +20,8 @@ data class RecognitionCandidate(
     val kanjiList: List<String> = listOf(romaji),
     val selectedKanji: String = kanjiList.firstOrNull() ?: romaji,
     val score: Float = 0f,
-    val displayText: String = selectedKanji
+    val displayText: String = selectedKanji,
+    val isEnglish: Boolean = false
 )
 
 interface GlideRecognizer {

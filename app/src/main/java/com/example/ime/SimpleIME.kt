@@ -415,7 +415,7 @@ class SimpleIME : InputMethodService() {
 
         currentCandidateGroups.forEachIndexed { index, group ->
             val tv = TextView(this).apply {
-                text = group.romaji
+                text = if (group.isEnglish) "${group.romaji} (EN)" else group.romaji
                 isFocusable = false
                 isFocusableInTouchMode = false
                 isClickable = true
@@ -424,7 +424,7 @@ class SimpleIME : InputMethodService() {
                 gravity = Gravity.CENTER
 
                 if (index == selectedGroupIndex) {
-                    setTextColor(Color.parseColor("#4FC3F7")) // 水色ハイライト
+                    setTextColor(if (group.isEnglish) Color.parseColor("#81C784") else Color.parseColor("#4FC3F7")) // 英語は緑、日本語は水色
                     setTypeface(null, Typeface.BOLD)
                     setBackgroundResource(R.drawable.key_action_background)
                 } else {
